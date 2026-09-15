@@ -45,6 +45,43 @@ describe('mergeAnalyses', () => {
     expect(merged.summary).toBe(finalSummary);
   });
 
+  it('decides type and language by majority vote, ties going to the first chunk', () => {
+    const merged = mergeAnalyses(
+      [
+        partial({ document: { type: 'inne', language: 'en' } }),
+        partial({ document: { type: 'umowa', language: 'pl' } }),
+        partial({ document: { type: 'umowa', language: 'pl' } }),
+      ],
+      finalSummary,
+    );
+    expect(merged.document.type).toBe('umowa');
+    expect(merged.document.language).toBe('pl');
+    const tie = mergeAnalyses(
+      [partial({ document: { type: 'raport' } }), partial({ document: { type: 'oferta' } })],
+      finalSummary,
+    );
+    expect(tie.document.type).toBe('raport');
+  });
+
+  it('keeps the first chunk key points when de-duplication would drop below 3', () => {
+    const merged = mergeAnalyses(
+      [partial({ keyPoints: ['A', 'a', 'A '] }), partial({ keyPoints: ['a', 'A', 'a'] })],
+      finalSummary,
+    );
+    expect(merged.keyPoints).toEqual(['A', 'a', 'A ']);
+  });
+
+  it('caps merged keywords at 10', () => {
+    const merged = mergeAnalyses(
+      [
+        partial({ keywords: ['k1', 'k2', 'k3', 'k4', 'k5', 'k6'] }),
+        partial({ keywords: ['k7', 'k8', 'k9', 'k10', 'k11', 'k12'] }),
+      ],
+      finalSummary,
+    );
+    expect(merged.keywords).toHaveLength(10);
+  });
+
   it('falls back to a later chunk for title and date when the first chunk has none', () => {
     const merged = mergeAnalyses(
       [partial({}), partial({ document: { title: 'Raport roczny', date: '2026-01-31' } })],
