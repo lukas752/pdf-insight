@@ -204,7 +204,21 @@ function Analyzer({ apiUrl }: { apiUrl: string }) {
         {messages.app.skipToContent}
       </a>
       <header className="app__header">
-        <h1 className="app__title">{messages.app.title}</h1>
+        <div className="brand">
+          <span className="brand__mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path
+                d="M7 2.5h7l5 5V20a1.5 1.5 0 0 1-1.5 1.5h-10.5A1.5 1.5 0 0 1 5.5 20V4A1.5 1.5 0 0 1 7 2.5zm6.5 1.5V8H18M8.5 12.5h7m-7 3.5h5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          <h1 className="app__title">{messages.app.title}</h1>
+        </div>
         <p className="app__tagline">{messages.app.tagline}</p>
       </header>
 

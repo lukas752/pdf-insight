@@ -63,7 +63,7 @@ export function ResultView({ result, onDownload, onReset }: ResultViewProps) {
           <dd>{formatLanguage(meta.language)}</dd>
           <dt>{messages.result.type}</dt>
           <dd>
-            <span className="badge">{messages.documentTypes[meta.type]}</span>
+            <span className={`badge badge--${meta.type}`}>{messages.documentTypes[meta.type]}</span>
           </dd>
           <dt>{messages.result.title}</dt>
           <dd lang={lang}>{meta.title ?? <span className="muted">{messages.result.none}</span>}</dd>
@@ -78,7 +78,7 @@ export function ResultView({ result, onDownload, onReset }: ResultViewProps) {
         </dl>
       </section>
 
-      <section className="card">
+      <section className="card card--summary">
         <h3 className="card__title">{messages.result.summary}</h3>
         <p className="result__summary" lang={lang}>
           {summary}

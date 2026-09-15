@@ -50,7 +50,7 @@ export function HistoryPanel({
                 >
                   <span className="history__file">{entry.fileName}</span>
                   <span className="history__meta">
-                    <span className="badge badge--small">
+                    <span className={`badge badge--small badge--${entry.result.document.type}`}>
                       {messages.documentTypes[entry.result.document.type]}
                     </span>
                     {' · '}
