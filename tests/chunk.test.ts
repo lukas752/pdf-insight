@@ -54,9 +54,13 @@ describe('chunkText', () => {
   it('overlaps consecutive chunks', () => {
     const chunks = chunkText(longText, options);
     for (let i = 0; i < chunks.length - 1; i += 1) {
-      const currentEnd = longText.indexOf(chunks[i] as string) + (chunks[i] as string).length;
-      const nextStart = longText.indexOf(chunks[i + 1] as string);
-      expect(nextStart).toBeLessThan(currentEnd);
+      const current = chunks[i];
+      const next = chunks[i + 1];
+      if (current === undefined || next === undefined) {
+        throw new Error('chunk index out of range');
+      }
+      const currentEnd = longText.indexOf(current) + current.length;
+      expect(longText.indexOf(next)).toBeLessThan(currentEnd);
     }
   });
 

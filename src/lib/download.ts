@@ -19,5 +19,7 @@ export function downloadJson(fileName: string, data: unknown): void {
   link.remove();
 
   // Revoke after the click has been handled so the browser can still read the blob.
-  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1_000);
 }

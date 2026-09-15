@@ -42,6 +42,6 @@ describe('mapWithConcurrency', () => {
   });
 
   it('handles an empty list', async () => {
-    expect(await mapWithConcurrency([], 4, async () => 1)).toEqual([]);
+    expect(await mapWithConcurrency([], 4, () => Promise.resolve(1))).toEqual([]);
   });
 });

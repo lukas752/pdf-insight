@@ -29,15 +29,15 @@ function json(body: unknown, status = 200): Response {
 }
 
 function mockFetch(...responses: (Response | Error)[]) {
-  const fetchMock = vi.fn(async () => {
+  const fetchMock = vi.fn(() => {
     const next = responses.shift();
     if (next === undefined) {
-      throw new Error('unexpected extra request');
+      return Promise.reject(new Error('unexpected extra request'));
     }
     if (next instanceof Error) {
-      throw next;
+      return Promise.reject(next);
     }
-    return next;
+    return Promise.resolve(next);
   });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
@@ -137,9 +137,9 @@ describe('analyzeText', () => {
     const controller = new AbortController();
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (_url: string, init: RequestInit) => {
+      vi.fn(() => {
         controller.abort();
-        throw (init.signal as AbortSignal).reason;
+        return Promise.reject(new DOMException('The operation was aborted.', 'AbortError'));
       }),
     );
     await expect(analyzeText('https://api.test', request, controller.signal)).rejects.toMatchObject(

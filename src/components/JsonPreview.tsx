@@ -17,7 +17,9 @@ export function JsonPreview({ data }: JsonPreviewProps) {
         className="button button--secondary"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          setOpen((value) => !value);
+        }}
       >
         {open ? messages.actions.hideJson : messages.actions.showJson}
       </button>

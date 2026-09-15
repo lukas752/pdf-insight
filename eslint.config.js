@@ -18,15 +18,24 @@ export default defineConfig(
     ],
   },
   js.configs.recommended,
-  tseslint.configs.strict,
-  tseslint.configs.stylistic,
+  // Type-aware linting: rules such as no-floating-promises and no-unsafe-* need type information.
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
   {
     files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      parserOptions: {
+        projectService: { allowDefaultProject: ['*.ts'] },
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     rules: {
       // `unknown` + Zod narrowing at every boundary; `any` is never acceptable.
       '@typescript-eslint/no-explicit-any': 'error',
       // Operational logging in the Worker goes through its `log()` helper only.
       'no-console': 'error',
+      // Numbers in template strings (page counts, byte sizes) are intentional and readable.
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
     },
   },
   {
@@ -41,6 +50,11 @@ export default defineConfig(
   {
     files: ['tests/**/*.ts'],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // Plain JS config files are not part of a TypeScript project.
+    files: ['**/*.js'],
+    extends: [tseslint.configs.disableTypeChecked],
   },
   prettier,
 );

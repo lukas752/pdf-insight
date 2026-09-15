@@ -16,7 +16,7 @@ export type HistoryEntry = z.infer<typeof historyEntrySchema>;
 /** localStorage can be missing or throw (private mode, disabled storage), so every access is guarded. */
 function getStorage(): Storage | null {
   try {
-    return globalThis.localStorage ?? null;
+    return 'localStorage' in globalThis ? globalThis.localStorage : null;
   } catch {
     return null;
   }

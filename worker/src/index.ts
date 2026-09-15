@@ -83,7 +83,9 @@ async function readBodyWithLimit(request: Request, limit: number): Promise<strin
     throw new HttpError(400, 'BAD_REQUEST', 'Missing request body');
   }
 
-  const reader = request.body.getReader();
+  // Workers types leave the chunk type open (`any`); the body of an HTTP request is bytes.
+  const body = request.body as ReadableStream<Uint8Array>;
+  const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let received = 0;
   for (;;) {
@@ -141,7 +143,9 @@ async function parseAnalyzeRequest(request: Request): Promise<AnalyzeRequest> {
 async function callModel(env: Env, payload: AnalyzeRequest): Promise<unknown> {
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 1 });
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, UPSTREAM_TIMEOUT_MS);
 
   const summarize = payload.task === 'summarize';
   const toolName = summarize ? SUMMARY_TOOL_NAME : ANALYSIS_TOOL_NAME;
@@ -193,7 +197,7 @@ async function callModel(env: Env, payload: AnalyzeRequest): Promise<unknown> {
     const toolUse = response.content.find(
       (block) => block.type === 'tool_use' && block.name === toolName,
     );
-    if (toolUse === undefined || toolUse.type !== 'tool_use') {
+    if (toolUse?.type !== 'tool_use') {
       throw new HttpError(502, 'UPSTREAM_ERROR', 'Model returned no structured output');
     }
     return toolUse.input;

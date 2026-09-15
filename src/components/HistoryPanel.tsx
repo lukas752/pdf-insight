@@ -46,7 +46,9 @@ export function HistoryPanel({
                   className="history__restore"
                   aria-label={messages.actions.restoreEntry(entry.fileName)}
                   aria-current={active ? 'true' : undefined}
-                  onClick={() => onRestore(entry)}
+                  onClick={() => {
+                    onRestore(entry);
+                  }}
                 >
                   <span className="history__file">{entry.fileName}</span>
                   <span className="history__meta">
@@ -63,7 +65,9 @@ export function HistoryPanel({
                   type="button"
                   className="history__delete"
                   aria-label={messages.actions.deleteEntry(entry.fileName)}
-                  onClick={() => onDelete(entry.id)}
+                  onClick={() => {
+                    onDelete(entry.id);
+                  }}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path

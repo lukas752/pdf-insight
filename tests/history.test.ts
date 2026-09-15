@@ -37,7 +37,9 @@ function fakeStorage(store = new Map<string, string>()) {
     removeItem: (key: string) => {
       store.delete(key);
     },
-    clear: () => store.clear(),
+    clear: () => {
+      store.clear();
+    },
     key: () => null,
     length: 0,
   };

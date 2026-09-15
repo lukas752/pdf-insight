@@ -138,16 +138,13 @@ async function requestValidated<T>(
 }
 
 /** The language the model itself reported in a rejected response, if it looks like an ISO code. */
+const detectedLanguageSchema = z.object({
+  document: z.object({ language: z.string().regex(/^[a-z]{2}$/) }),
+});
+
 function detectedLanguage(body: unknown): string | undefined {
-  if (typeof body !== 'object' || body === null || !('document' in body)) {
-    return undefined;
-  }
-  const document = (body as { document: unknown }).document;
-  if (typeof document !== 'object' || document === null || !('language' in document)) {
-    return undefined;
-  }
-  const language = (document as { language: unknown }).language;
-  return typeof language === 'string' && /^[a-z]{2}$/.test(language) ? language : undefined;
+  const parsed = detectedLanguageSchema.safeParse(body);
+  return parsed.success ? parsed.data.document.language : undefined;
 }
 
 export function analyzeText(

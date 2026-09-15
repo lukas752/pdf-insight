@@ -92,7 +92,7 @@ npx wrangler dev                 # http://localhost:8787
 ### Testy i jakość
 
 ```bash
-npm run lint        # ESLint (typescript-eslint, react-hooks, jsx-a11y)
+npm run lint        # ESLint z informacją o typach (strictTypeChecked + stylisticTypeChecked), react-hooks, jsx-a11y
 npm run typecheck   # tsc strict dla frontendu; `npm run typecheck --prefix worker` dla Workera
 npm test -- --run   # Vitest
 npm run build       # Vite → dist/

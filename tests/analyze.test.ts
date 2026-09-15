@@ -42,7 +42,7 @@ describe('analyzeFile', () => {
 
   it('analyses a short document with a single request and no summarize call', async () => {
     extractText.mockResolvedValue({ text: 'Krótki tekst umowy.', pages: 1 });
-    const fetchMock = vi.fn(async () => json(workerBody('A')));
+    const fetchMock = vi.fn(() => Promise.resolve(json(workerBody('A'))));
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await analyzeFile(file, 'https://api.test', () => undefined);
@@ -55,14 +55,16 @@ describe('analyzeFile', () => {
   it('chunks a long document, merges the parts and asks for one final summary', async () => {
     extractText.mockResolvedValue({ text: longText, pages: 65 });
     const tasks: string[] = [];
-    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+    const fetchMock = vi.fn((_url: string, init: RequestInit) => {
       const body = JSON.parse(init.body as string) as { task: string; text: string };
       tasks.push(body.task);
       if (body.task === 'summarize') {
-        return json({ summarySentences: ['Całość raz.', 'Całość dwa.', 'Całość trzy.'] });
+        return Promise.resolve(
+          json({ summarySentences: ['Całość raz.', 'Całość dwa.', 'Całość trzy.'] }),
+        );
       }
       expect(body.text.length).toBeLessThanOrEqual(DEFAULT_CHUNK_OPTIONS.size);
-      return json(workerBody(String(tasks.length)));
+      return Promise.resolve(json(workerBody(String(tasks.length))));
     });
     vi.stubGlobal('fetch', fetchMock);
     const phases: string[] = [];
@@ -82,9 +84,9 @@ describe('analyzeFile', () => {
   it('stops sending remaining chunks after the first failure', async () => {
     extractText.mockResolvedValue({ text: longText, pages: 65 });
     let calls = 0;
-    const fetchMock = vi.fn(async () => {
+    const fetchMock = vi.fn(() => {
       calls += 1;
-      return json({ error: { code: 'RATE_LIMITED', message: 'slow down' } }, 429);
+      return Promise.resolve(json({ error: { code: 'RATE_LIMITED', message: 'slow down' } }, 429));
     });
     vi.stubGlobal('fetch', fetchMock);
 

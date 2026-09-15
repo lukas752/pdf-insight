@@ -30,7 +30,9 @@ export async function analyzeFile(
   const { extractText } = await import('./pdf');
   const { text, pages } = await extractText(
     file,
-    (page, total) => onProgress({ phase: 'extracting', page, total }),
+    (page, total) => {
+      onProgress({ phase: 'extracting', page, total });
+    },
     signal,
   );
   if (text.length > MAX_DOCUMENT_CHARS) {

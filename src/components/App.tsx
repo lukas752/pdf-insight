@@ -244,7 +244,9 @@ function Analyzer({ apiUrl }: { apiUrl: string }) {
           {status.kind === 'done' && (
             <ResultView
               result={status.result}
-              onDownload={() => handleDownload(status.result)}
+              onDownload={() => {
+                handleDownload(status.result);
+              }}
               onReset={handleReset}
             />
           )}

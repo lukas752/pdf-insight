@@ -42,9 +42,9 @@ function withChange(change: (draft: Analysis) => void): unknown {
 
 /** The Worker's response shape: the contract minus `summary`, plus `summarySentences`. */
 function workerResponse(sentences: string[]): unknown {
-  const { summary, ...rest } = structuredClone(validAnalysis);
-  void summary;
-  return { ...rest, summarySentences: sentences };
+  const { document, keyPoints, entities, amounts, dates, keywords } =
+    structuredClone(validAnalysis);
+  return { document, keyPoints, entities, amounts, dates, keywords, summarySentences: sentences };
 }
 
 describe('analysisSchema (public contract)', () => {
