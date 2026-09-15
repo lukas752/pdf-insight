@@ -16,6 +16,11 @@ describe('validateFile', () => {
     expect(validateFile(fakeFile('UMOWA.PDF', 1024, 'application/pdf'))).toEqual({ ok: true });
   });
 
+  it('accepts a PDF whose MIME type the browser could not determine', () => {
+    expect(validateFile(fakeFile('umowa.pdf', 1024, '')).ok).toBe(true);
+    expect(validateFile(fakeFile('umowa.pdf', 1024, 'application/x-pdf')).ok).toBe(true);
+  });
+
   it('accepts a file of exactly 10 MB', () => {
     expect(validateFile(fakeFile('a.pdf', MAX_FILE_SIZE_BYTES, 'application/pdf')).ok).toBe(true);
   });
