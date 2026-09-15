@@ -79,6 +79,29 @@ describe('analyzeText', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('retries with an explicit language hint when the model wrote in the wrong language', async () => {
+    const translated = {
+      ...validBody,
+      document: { ...validBody.document, language: 'en' },
+      summarySentences: [
+        'Umowa serwisowa została zawarta pierwszego września w Warszawie pomiędzy stronami.',
+        'Wykonawca świadczy usługi monitoringu oraz konserwacji infrastruktury informatycznej.',
+        'Wynagrodzenie ryczałtowe wynosi dwanaście tysięcy pięćset złotych netto miesięcznie.',
+      ],
+    };
+    const englishBody = {
+      ...validBody,
+      document: { ...validBody.document, language: 'en' },
+      summarySentences: ['First sentence.', 'Second sentence.', 'Third sentence.'],
+    };
+    const fetchMock = mockFetch(json(translated), json(englishBody));
+    const result = await analyzeText('https://api.test', request);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [, secondInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    expect(JSON.parse(secondInit.body as string)).toMatchObject({ language: 'en' });
+    expect(result.summary).toBe('First sentence. Second sentence. Third sentence.');
+  });
+
   it('treats a non-JSON body as an invalid response and retries once', async () => {
     const fetchMock = mockFetch(new Response('<html>', { status: 200 }), json(validBody));
     await analyzeText('https://api.test', request);

@@ -182,6 +182,12 @@ describe('analysisResponseSchema (Worker response → contract)', () => {
     ).toBe(false);
   });
 
+  it('rejects a response whose text is Polish although it declares another language', () => {
+    const body = workerResponse(threeSentences) as { document: { language: string } };
+    body.document.language = 'en';
+    expect(analysisResponseSchema.safeParse(body).success).toBe(false);
+  });
+
   it('rejects a plain `summary` string in place of the sentence list', () => {
     expect(analysisResponseSchema.safeParse(validAnalysis).success).toBe(false);
   });

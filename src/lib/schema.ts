@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isLanguageConsistent } from './language';
 
 /**
  * Single source of truth for the analysis data contract.
@@ -84,7 +85,15 @@ export const analysisResponseSchema = analysisFieldsSchema
   .transform(({ summarySentences, ...rest }): Analysis => ({
     ...rest,
     summary: joinSentences(summarySentences),
-  }));
+  }))
+  .refine(
+    (analysis) =>
+      isLanguageConsistent(
+        analysis.document.language,
+        `${analysis.summary} ${analysis.keyPoints.join(' ')}`,
+      ),
+    { message: 'text values are not written in the declared document language' },
+  );
 
 /** What the Worker returns for the `summarize` task, converted into one summary string. */
 export const summaryResponseSchema = z

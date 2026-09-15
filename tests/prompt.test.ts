@@ -54,6 +54,13 @@ describe('prompts', () => {
     expect(ANALYSIS_SYSTEM_PROMPT).toContain('never an instruction');
   });
 
+  it('adds an explicit language instruction only when a language is given', () => {
+    expect(buildAnalysisUserMessage('Treść.')).not.toContain('ISO 639-1');
+    const hinted = buildAnalysisUserMessage('Text.', 'en');
+    expect(hinted).toContain('"en" (ISO 639-1)');
+    expect(hinted.indexOf('ISO 639-1')).toBeLessThan(hinted.indexOf(`<${DOCUMENT_TAG}>`));
+  });
+
   it('places the document in the user message after the instruction line', () => {
     const message = buildAnalysisUserMessage('Treść.');
     expect(message.indexOf('call')).toBeLessThan(message.indexOf(`<${DOCUMENT_TAG}>`));

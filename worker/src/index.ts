@@ -157,7 +157,7 @@ async function callModel(env: Env, payload: AnalyzeRequest): Promise<unknown> {
             role: 'user',
             content: summarize
               ? buildSummaryUserMessage(payload.text, payload.language ?? 'pl')
-              : buildAnalysisUserMessage(payload.text),
+              : buildAnalysisUserMessage(payload.text, payload.language),
           },
         ],
         tools: [

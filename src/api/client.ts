@@ -92,7 +92,7 @@ async function send(
   return response;
 }
 
-type Attempt<T> = { ok: true; data: T } | { ok: false; detail: string };
+type Attempt<T> = { ok: true; data: T } | { ok: false; detail: string; body: unknown };
 
 /** One request whose body is parsed and validated; an invalid body is reported, not thrown. */
 async function attempt<T>(
@@ -106,33 +106,48 @@ async function attempt<T>(
   try {
     body = await response.json();
   } catch {
-    return { ok: false, detail: 'Response body is not JSON' };
+    return { ok: false, detail: 'Response body is not JSON', body: null };
   }
   const parsed = schema.safeParse(body);
   return parsed.success
     ? { ok: true, data: parsed.data }
-    : { ok: false, detail: z.prettifyError(parsed.error) };
+    : { ok: false, detail: z.prettifyError(parsed.error), body };
 }
 
 /**
  * A response that fails validation is retried exactly once; a second failure surfaces as
  * INVALID_RESPONSE. HTTP and network errors are not retried here – the user gets a retry button.
+ * `adjustRetry` may derive a more specific request for the retry from the rejected body.
  */
 async function requestValidated<T>(
   apiUrl: string,
   request: AnalyzeRequest,
   schema: z.ZodType<T>,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  adjustRetry: (rejectedBody: unknown) => AnalyzeRequest = () => request,
 ): Promise<T> {
   const first = await attempt(apiUrl, request, schema, signal);
   if (first.ok) {
     return first.data;
   }
-  const second = await attempt(apiUrl, request, schema, signal);
+  const second = await attempt(apiUrl, adjustRetry(first.body), schema, signal);
   if (second.ok) {
     return second.data;
   }
   throw new ApiError('INVALID_RESPONSE', second.detail);
+}
+
+/** The language the model itself reported in a rejected response, if it looks like an ISO code. */
+function detectedLanguage(body: unknown): string | undefined {
+  if (typeof body !== 'object' || body === null || !('document' in body)) {
+    return undefined;
+  }
+  const document = (body as { document: unknown }).document;
+  if (typeof document !== 'object' || document === null || !('language' in document)) {
+    return undefined;
+  }
+  const language = (document as { language: unknown }).language;
+  return typeof language === 'string' && /^[a-z]{2}$/.test(language) ? language : undefined;
 }
 
 export function analyzeText(
@@ -140,7 +155,12 @@ export function analyzeText(
   request: Omit<AnalyzeRequest, 'task'>,
   signal?: AbortSignal,
 ): Promise<Analysis> {
-  return requestValidated(apiUrl, { ...request, task: 'analyze' }, analysisResponseSchema, signal);
+  const analyzeRequest: AnalyzeRequest = { ...request, task: 'analyze' };
+  // If the model detected the language but wrote in another one, the retry says which to use.
+  return requestValidated(apiUrl, analyzeRequest, analysisResponseSchema, signal, (rejected) => {
+    const language = detectedLanguage(rejected);
+    return language === undefined ? analyzeRequest : { ...analyzeRequest, language };
+  });
 }
 
 export function summarizeText(

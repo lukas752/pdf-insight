@@ -20,7 +20,7 @@ Rules:
 8. Every date uses ISO 8601 (YYYY-MM-DD). Skip a date whose full day, month and year are not stated. Every currency uses its ISO 4217 code (PLN, EUR, USD). "value" is a plain number without thousands separators or symbols: 12500.5, never "12 500,50 zł".
 9. "entities.organizations" lists companies, institutions and public bodies named in the text. "entities.people" lists full names of natural persons. Keep the spelling used in the document and do not repeat entries.
 10. "keywords" holds 3 to 10 lowercase keywords in the document's language.
-11. JSON keys are fixed by the tool schema and stay in English; all values are written in the document's language.`;
+11. JSON keys are fixed by the tool schema and stay in English. Every text value – summarySentences, keyPoints, title and every context – is written in the language of the document itself, the same language you report in "document.language". Never translate: an English document gets an English summary and English key points, a German document German ones. The Polish words in the "type" enum (faktura, umowa, oferta, raport, inne) are fixed category codes and say nothing about the output language.`;
 
 export const SUMMARY_SYSTEM_PROMPT = `You receive several partial summaries of consecutive fragments of one document inside <${DOCUMENT_TAG}> tags. Call the tool "${SUMMARY_TOOL_NAME}" exactly once with a single coherent summary of the whole document.
 
@@ -43,8 +43,12 @@ export function wrapDocumentText(text: string): string {
   return `<${DOCUMENT_TAG}>\n${sanitizeDocumentText(text)}\n</${DOCUMENT_TAG}>`;
 }
 
-export function buildAnalysisUserMessage(text: string): string {
-  return `Analyse the document below and call ${ANALYSIS_TOOL_NAME}.\n\n${wrapDocumentText(text)}`;
+export function buildAnalysisUserMessage(text: string, language?: string): string {
+  const languageLine =
+    language === undefined
+      ? ''
+      : `The document is written in "${language}" (ISO 639-1). Write summarySentences, keyPoints, title and every context value in that language.\n\n`;
+  return `${languageLine}Analyse the document below and call ${ANALYSIS_TOOL_NAME}.\n\n${wrapDocumentText(text)}`;
 }
 
 export function buildSummaryUserMessage(text: string, language: string): string {
