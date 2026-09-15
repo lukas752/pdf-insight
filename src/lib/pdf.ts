@@ -1,6 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import type { TextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/api';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { PdfOpenError, ScannedPdfError } from './errors';
 import { hasTextLayer, normaliseWhitespace } from './text';
 
 // Imported with `?url` so Vite rewrites the path for the GitHub Pages base (/pdf-insight/).
@@ -12,22 +13,6 @@ export interface ExtractedText {
 }
 
 export type ExtractionProgress = (pagesDone: number, totalPages: number) => void;
-
-/** The file could not be parsed as a PDF (corrupt, encrypted or not a PDF at all). */
-export class PdfOpenError extends Error {
-  constructor(cause: unknown) {
-    super('Could not open PDF', { cause });
-    this.name = 'PdfOpenError';
-  }
-}
-
-/** The PDF opened fine but carries (almost) no text layer – most likely a scan. */
-export class ScannedPdfError extends Error {
-  constructor(public readonly pages: number) {
-    super('PDF has no usable text layer');
-    this.name = 'ScannedPdfError';
-  }
-}
 
 function isTextItem(item: TextItem | TextMarkedContent): item is TextItem {
   return 'str' in item;

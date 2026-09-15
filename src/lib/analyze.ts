@@ -2,19 +2,12 @@ import { analyzeText, ApiError, summarizeText } from '../api/client';
 import { chunkText } from './chunk';
 import { mapWithConcurrency } from './concurrency';
 import { mergeAnalyses } from './merge';
-import { extractText } from './pdf';
+import { DocumentTooLongError } from './errors';
 import { analysisSchema, type Analysis } from './schema';
 
 /** Roughly 100 dense pages. Beyond this a document would need more requests than the rate limit allows. */
 export const MAX_DOCUMENT_CHARS = 300_000;
 const CHUNK_CONCURRENCY = 4;
-
-export class DocumentTooLongError extends Error {
-  constructor(public readonly characters: number) {
-    super('Document text exceeds the supported length');
-    this.name = 'DocumentTooLongError';
-  }
-}
 
 export type AnalysisProgress =
   | { phase: 'extracting'; page: number; total: number }
@@ -31,6 +24,8 @@ export async function analyzeFile(
   onProgress: (progress: AnalysisProgress) => void,
   signal?: AbortSignal,
 ): Promise<Analysis> {
+  // pdf.js is ~1 MB, so it is loaded on first use instead of with the app shell.
+  const { extractText } = await import('./pdf');
   const { text, pages } = await extractText(file, (page, total) => {
     onProgress({ phase: 'extracting', page, total });
   });
