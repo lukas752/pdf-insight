@@ -3,9 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
 # Non-secret configuration. The API key is a secret: `wrangler secret put ANTHROPIC_API_KEY`.
+# Local development overrides these in worker/.dev.vars (see .dev.vars.example).
 [vars]
 ANTHROPIC_MODEL = "claude-sonnet-5"
-ALLOWED_ORIGINS = "https://lukas752.github.io,http://localhost:5173"
+ALLOWED_ORIGINS = "https://lukas752.github.io"
 RATE_LIMIT_MAX = "20"
 RATE_LIMIT_WINDOW_SECONDS = "600"
 

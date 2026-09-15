@@ -1,3 +1,5 @@
 # Copy to worker/.dev.vars for local development only. Never commit .dev.vars.
-# Production uses `wrangler secret put ANTHROPIC_API_KEY` instead.
+# Production uses `wrangler secret put ANTHROPIC_API_KEY` and the vars in wrangler.toml.
 ANTHROPIC_API_KEY=
+# Let the local Vite dev server call the local Worker.
+ALLOWED_ORIGINS=http://localhost:5173
