@@ -26,6 +26,7 @@ export function corsHeaders(origin: string): Record<string, string> {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400',
+    'Access-Control-Expose-Headers': 'Retry-After',
     Vary: 'Origin',
   };
 }

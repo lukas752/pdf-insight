@@ -37,7 +37,7 @@ type ErrorCode =
 
 const MAX_BODY_BYTES = 1_000_000;
 const UPSTREAM_TIMEOUT_MS = 45_000;
-const MAX_OUTPUT_TOKENS = 8_192;
+const MAX_OUTPUT_TOKENS = 16_000;
 const DEFAULT_RATE_LIMIT_MAX = 20;
 const DEFAULT_RATE_LIMIT_WINDOW_SECONDS = 600;
 
@@ -47,6 +47,8 @@ class HttpError extends Error {
     public readonly code: ErrorCode,
     message: string,
     public readonly extraHeaders: Record<string, string> = {},
+    /** Logged for operators, never sent to the client. */
+    public readonly detail?: string,
   ) {
     super(message);
   }
@@ -169,9 +171,24 @@ async function callModel(env: Env, payload: AnalyzeRequest): Promise<unknown> {
           },
         ],
         tool_choice: { type: 'tool', name: toolName },
+        // Extraction is not a hard reasoning task; medium effort keeps latency and cost down.
+        output_config: { effort: 'medium' },
       },
       { signal: controller.signal },
     );
+
+    if (response.stop_reason === 'max_tokens') {
+      throw new HttpError(502, 'UPSTREAM_ERROR', 'Model output was truncated', {}, 'max_tokens');
+    }
+    if (response.stop_reason === 'refusal') {
+      throw new HttpError(
+        502,
+        'UPSTREAM_ERROR',
+        'Model declined to process the text',
+        {},
+        'refusal',
+      );
+    }
 
     const toolUse = response.content.find(
       (block) => block.type === 'tool_use' && block.name === toolName,
@@ -188,14 +205,22 @@ async function callModel(env: Env, payload: AnalyzeRequest): Promise<unknown> {
       throw new HttpError(504, 'UPSTREAM_TIMEOUT', 'AI request timed out');
     }
     if (error instanceof Anthropic.APIError) {
-      // Never forward the upstream body – it may contain request details.
+      // Never forward the upstream body or status – log them, return a constant message.
       throw new HttpError(
         502,
         'UPSTREAM_ERROR',
-        `AI service error (status ${error.status ?? 'n/a'})`,
+        'AI service error',
+        {},
+        `upstream_${error.status ?? 'unknown'}`,
       );
     }
-    throw new HttpError(502, 'UPSTREAM_ERROR', 'AI service unavailable');
+    throw new HttpError(
+      502,
+      'UPSTREAM_ERROR',
+      'AI service unavailable',
+      {},
+      error instanceof Error ? error.name : 'unknown',
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -213,7 +238,16 @@ function withDocumentMeta(result: unknown, payload: AnalyzeRequest): unknown {
 }
 
 function toHttpError(error: unknown): HttpError {
-  return error instanceof HttpError ? error : new HttpError(500, 'INTERNAL', 'Internal error');
+  if (error instanceof HttpError) {
+    return error;
+  }
+  return new HttpError(
+    500,
+    'INTERNAL',
+    'Internal error',
+    {},
+    error instanceof Error ? error.name : 'unknown',
+  );
 }
 
 async function handleAnalyze(request: Request, env: Env): Promise<Response> {
@@ -254,10 +288,13 @@ async function handleAnalyze(request: Request, env: Env): Promise<Response> {
     // Every error after the origin check must carry CORS headers, otherwise the browser
     // hides the error envelope behind a generic network failure.
     const httpError = toHttpError(error);
-    throw new HttpError(httpError.status, httpError.code, httpError.message, {
-      ...headers,
-      ...httpError.extraHeaders,
-    });
+    throw new HttpError(
+      httpError.status,
+      httpError.code,
+      httpError.message,
+      { ...headers, ...httpError.extraHeaders },
+      httpError.detail,
+    );
   }
 }
 
@@ -267,6 +304,7 @@ export default {
     const url = new URL(request.url);
     let response: Response;
     let code: string | undefined;
+    let detail: string | undefined;
 
     try {
       if (url.pathname === '/health' && request.method === 'GET') {
@@ -279,6 +317,7 @@ export default {
     } catch (error) {
       const httpError = toHttpError(error);
       code = httpError.code;
+      detail = httpError.detail;
       response = errorResponse(httpError, {});
     }
 
@@ -287,7 +326,8 @@ export default {
       path: url.pathname,
       status: response.status,
       durationMs: Date.now() - startedAt,
-      ...(code === undefined ? {} : { code }),
+      code,
+      detail,
     });
     return response;
   },
