@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+worker/node_modules/
+
+# build output
+dist/
+worker/dist/
+
+# local secrets and environment — never committed
+.env
+.env.*
+!.env.example
+.dev.vars
+worker/.dev.vars
+
+# wrangler local state
+.wrangler/
+worker/.wrangler/
+
+# misc
+coverage/
+*.log
+.DS_Store
