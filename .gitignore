@@ -21,3 +21,6 @@ worker/.wrangler/
 coverage/
 *.log
 .DS_Store
+
+# local tooling
+.claude/

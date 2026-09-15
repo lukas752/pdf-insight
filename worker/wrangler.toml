@@ -1,0 +1,18 @@
+name = "pdf-insight-api"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Non-secret configuration. The API key is a secret: `wrangler secret put ANTHROPIC_API_KEY`.
+[vars]
+ANTHROPIC_MODEL = "claude-sonnet-5"
+ALLOWED_ORIGINS = "https://lukas752.github.io,http://localhost:5173"
+RATE_LIMIT_MAX = "20"
+RATE_LIMIT_WINDOW_SECONDS = "600"
+
+# Fixed-window rate limiter storage, keyed by client IP.
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "b5f204803ebe4667b352730ac6d33840"
+
+[observability]
+enabled = true
