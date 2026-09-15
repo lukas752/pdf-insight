@@ -212,6 +212,10 @@ function withDocumentMeta(result: unknown, payload: AnalyzeRequest): unknown {
   };
 }
 
+function toHttpError(error: unknown): HttpError {
+  return error instanceof HttpError ? error : new HttpError(500, 'INTERNAL', 'Internal error');
+}
+
 async function handleAnalyze(request: Request, env: Env): Promise<Response> {
   const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
   const origin = resolveAllowedOrigin(request.headers.get('Origin'), allowedOrigins);
@@ -221,34 +225,40 @@ async function handleAnalyze(request: Request, env: Env): Promise<Response> {
   }
   const headers = corsHeaders(origin);
 
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers });
-  }
-  if (request.method !== 'POST') {
-    throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Use POST', {
+  try {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers });
+    }
+    if (request.method !== 'POST') {
+      throw new HttpError(405, 'METHOD_NOT_ALLOWED', 'Use POST', { Allow: 'POST, OPTIONS' });
+    }
+
+    const clientIp = request.headers.get('CF-Connecting-IP') ?? 'unknown';
+    const limit = await checkRateLimit(
+      env.RATE_LIMIT,
+      clientIp,
+      positiveIntFromEnv(env.RATE_LIMIT_MAX, DEFAULT_RATE_LIMIT_MAX),
+      positiveIntFromEnv(env.RATE_LIMIT_WINDOW_SECONDS, DEFAULT_RATE_LIMIT_WINDOW_SECONDS),
+    );
+    if (!limit.allowed) {
+      throw new HttpError(429, 'RATE_LIMITED', 'Too many requests', {
+        'Retry-After': String(limit.retryAfterSeconds),
+      });
+    }
+
+    const payload = await parseAnalyzeRequest(request);
+    const result = await callModel(env, payload);
+    const body = payload.task === 'analyze' ? withDocumentMeta(result, payload) : result;
+    return jsonResponse(body, 200, headers);
+  } catch (error) {
+    // Every error after the origin check must carry CORS headers, otherwise the browser
+    // hides the error envelope behind a generic network failure.
+    const httpError = toHttpError(error);
+    throw new HttpError(httpError.status, httpError.code, httpError.message, {
       ...headers,
-      Allow: 'POST, OPTIONS',
+      ...httpError.extraHeaders,
     });
   }
-
-  const clientIp = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  const limit = await checkRateLimit(
-    env.RATE_LIMIT,
-    clientIp,
-    positiveIntFromEnv(env.RATE_LIMIT_MAX, DEFAULT_RATE_LIMIT_MAX),
-    positiveIntFromEnv(env.RATE_LIMIT_WINDOW_SECONDS, DEFAULT_RATE_LIMIT_WINDOW_SECONDS),
-  );
-  if (!limit.allowed) {
-    throw new HttpError(429, 'RATE_LIMITED', 'Too many requests', {
-      ...headers,
-      'Retry-After': String(limit.retryAfterSeconds),
-    });
-  }
-
-  const payload = await parseAnalyzeRequest(request);
-  const result = await callModel(env, payload);
-  const body = payload.task === 'analyze' ? withDocumentMeta(result, payload) : result;
-  return jsonResponse(body, 200, headers);
 }
 
 export default {
@@ -267,10 +277,8 @@ export default {
         throw new HttpError(404, 'NOT_FOUND', 'Not found');
       }
     } catch (error) {
-      const httpError =
-        error instanceof HttpError ? error : new HttpError(500, 'INTERNAL', 'Internal error');
+      const httpError = toHttpError(error);
       code = httpError.code;
-      // Only errors raised after the origin check carry CORS headers (inside extraHeaders).
       response = errorResponse(httpError, {});
     }
 
