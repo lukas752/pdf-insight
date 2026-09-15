@@ -1,13 +1,15 @@
 import { analyzeText, ApiError, summarizeText } from '../api/client';
 import { chunkText } from './chunk';
 import { mapWithConcurrency } from './concurrency';
-import { mergeAnalyses } from './merge';
 import { DocumentTooLongError } from './errors';
+import { mergeAnalyses, mostCommon } from './merge';
 import { analysisSchema, type Analysis } from './schema';
 
 /** Roughly 100 dense pages. Beyond this a document would need more requests than the rate limit allows. */
 export const MAX_DOCUMENT_CHARS = 300_000;
 const CHUNK_CONCURRENCY = 4;
+/** Matches the Worker's request schema. */
+const MAX_FILE_NAME_CHARS = 255;
 
 export type AnalysisProgress =
   | { phase: 'extracting'; page: number; total: number }
@@ -24,47 +26,65 @@ export async function analyzeFile(
   onProgress: (progress: AnalysisProgress) => void,
   signal?: AbortSignal,
 ): Promise<Analysis> {
-  // pdf.js is ~1 MB, so it is loaded on first use instead of with the app shell.
+  // pdf.js is large, so it is loaded on first use instead of with the app shell.
   const { extractText } = await import('./pdf');
-  const { text, pages } = await extractText(file, (page, total) => {
-    onProgress({ phase: 'extracting', page, total });
-  });
+  const { text, pages } = await extractText(
+    file,
+    (page, total) => onProgress({ phase: 'extracting', page, total }),
+    signal,
+  );
   if (text.length > MAX_DOCUMENT_CHARS) {
     throw new DocumentTooLongError(text.length);
   }
 
   const chunks = chunkText(text);
-  const base = { fileName: file.name, pages };
+  const base = { fileName: file.name.slice(0, MAX_FILE_NAME_CHARS), pages };
   let done = 0;
   onProgress({ phase: 'analyzing', done, total: chunks.length });
 
-  const partials = await mapWithConcurrency(chunks, CHUNK_CONCURRENCY, async (chunk) => {
-    const result = await analyzeText(apiUrl, { ...base, text: chunk }, signal);
-    done += 1;
-    onProgress({ phase: 'analyzing', done, total: chunks.length });
-    return result;
-  });
+  // The first failing chunk stops the rest, so no quota is spent on a result that is discarded.
+  const chunkAbort = new AbortController();
+  const chunkSignal =
+    signal === undefined ? chunkAbort.signal : AbortSignal.any([signal, chunkAbort.signal]);
+
+  const partials = await mapWithConcurrency(
+    chunks,
+    CHUNK_CONCURRENCY,
+    async (chunk) => {
+      try {
+        const result = await analyzeText(apiUrl, { ...base, text: chunk }, chunkSignal);
+        done += 1;
+        onProgress({ phase: 'analyzing', done, total: chunks.length });
+        return result;
+      } catch (error) {
+        chunkAbort.abort();
+        throw error;
+      }
+    },
+    chunkSignal,
+  );
 
   const first = partials[0];
   if (first === undefined) {
     throw new ApiError('INVALID_RESPONSE', 'No analysis produced');
   }
-  if (partials.length === 1) {
-    return first;
+
+  let summary = first.summary;
+  if (partials.length > 1) {
+    onProgress({ phase: 'summarizing' });
+    summary = await summarizeText(
+      apiUrl,
+      {
+        ...base,
+        language: mostCommon(partials.map((partial) => partial.document.language)),
+        text: partials.map((partial) => partial.summary).join('\n\n'),
+      },
+      signal,
+    );
   }
 
-  onProgress({ phase: 'summarizing' });
-  const summary = await summarizeText(
-    apiUrl,
-    {
-      ...base,
-      language: first.document.language,
-      text: partials.map((partial) => partial.summary).join('\n\n'),
-    },
-    signal,
-  );
-
-  // The merged object is re-validated so the UI never renders anything outside the contract.
+  // Merging de-duplicates lists (also for a single chunk); the result is re-validated so the UI
+  // never renders anything outside the contract.
   const merged = analysisSchema.safeParse(mergeAnalyses(partials, summary));
   if (!merged.success) {
     throw new ApiError('INVALID_RESPONSE', 'Merged result failed validation');

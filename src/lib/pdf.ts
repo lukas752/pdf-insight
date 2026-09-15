@@ -34,6 +34,7 @@ function pageTextFromItems(items: (TextItem | TextMarkedContent)[]): string {
 export async function extractText(
   file: Blob,
   onProgress?: ExtractionProgress,
+  signal?: AbortSignal,
 ): Promise<ExtractedText> {
   const data = new Uint8Array(await file.arrayBuffer());
 
@@ -48,6 +49,9 @@ export async function extractText(
   try {
     const pageTexts: string[] = [];
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      if (signal?.aborted === true) {
+        throw new DOMException('Extraction aborted', 'AbortError');
+      }
       const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
       pageTexts.push(pageTextFromItems(content.items));

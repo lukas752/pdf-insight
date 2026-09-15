@@ -23,6 +23,24 @@ describe('mapWithConcurrency', () => {
     expect(maxInFlight).toBe(3);
   });
 
+  it('starts no new tasks once the signal is aborted', async () => {
+    const controller = new AbortController();
+    const started: number[] = [];
+    await mapWithConcurrency(
+      [1, 2, 3, 4, 5, 6],
+      2,
+      async (item) => {
+        started.push(item);
+        if (item === 2) {
+          controller.abort();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      },
+      controller.signal,
+    );
+    expect(started.length).toBeLessThan(6);
+  });
+
   it('handles an empty list', async () => {
     expect(await mapWithConcurrency([], 4, async () => 1)).toEqual([]);
   });

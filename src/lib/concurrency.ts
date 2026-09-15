@@ -1,14 +1,18 @@
-/** Runs `task` over `items` with at most `limit` in flight; results keep the input order. */
+/**
+ * Runs `task` over `items` with at most `limit` in flight; results keep the input order.
+ * Once `signal` is aborted no further items are started (in-flight tasks finish on their own).
+ */
 export async function mapWithConcurrency<T, R>(
   items: readonly T[],
   limit: number,
   task: (item: T, index: number) => Promise<R>,
+  signal?: AbortSignal,
 ): Promise<R[]> {
   const results = new Array<R>(items.length);
   let nextIndex = 0;
 
   async function worker(): Promise<void> {
-    while (nextIndex < items.length) {
+    while (nextIndex < items.length && signal?.aborted !== true) {
       const index = nextIndex;
       nextIndex += 1;
       results[index] = await task(items[index] as T, index);
