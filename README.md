@@ -8,7 +8,9 @@ na stanowisko **Vibe Coder**.
 
 **https://lukas752.github.io/pdf-insight/**
 
-![Zrzut ekranu PDF Insight – ekran główny demo](docs/screenshot.png)
+![Zrzut ekranu PDF Insight – ekran główny z wynikiem analizy umowy](docs/screenshot.png)
+
+![Zrzut ekranu PDF Insight – karta dokumentu, podsumowanie i najważniejsze punkty](docs/screenshot-result.png)
 
 Jak sprawdzić w 30 sekund: otwórz link, przeciągnij dowolny PDF z warstwą tekstową (umowa, faktura,
 raport – po polsku lub po angielsku), poczekaj kilka sekund, kliknij **Pobierz JSON**.
