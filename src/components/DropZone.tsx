@@ -1,12 +1,14 @@
-import { useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useRef, useState, type DragEvent, type KeyboardEvent, type Ref } from 'react';
 import { messages } from '../lib/messages';
 
 interface DropZoneProps {
   onFile: (file: File) => void;
   disabled: boolean;
+  /** Lets the parent move focus back here, e.g. after the result view is dismissed. */
+  ref?: Ref<HTMLDivElement> | undefined;
 }
 
-export function DropZone({ onFile, disabled }: DropZoneProps) {
+export function DropZone({ onFile, disabled, ref }: DropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -56,6 +58,7 @@ export function DropZone({ onFile, disabled }: DropZoneProps) {
 
   return (
     <div
+      ref={ref}
       role="button"
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}

@@ -9,6 +9,21 @@ export const messages = {
       'Wgraj plik PDF – otrzymasz krótkie podsumowanie i uporządkowane dane w formacie JSON.',
     footer:
       'Tekst jest odczytywany lokalnie w przeglądarce. Analizę wykonuje model Claude (Anthropic).',
+    skipToContent: 'Przejdź do treści',
+  },
+  empty: {
+    ariaLabel: 'Jak to działa',
+    steps: [
+      { title: 'Wgraj PDF', text: 'Przeciągnij plik albo wybierz go z dysku. Maksymalnie 10 MB.' },
+      {
+        title: 'Odczyt lokalny',
+        text: 'Tekst jest wyodrębniany w Twojej przeglądarce – plik nie jest nigdzie wysyłany.',
+      },
+      {
+        title: 'Podsumowanie i dane',
+        text: 'Otrzymasz 3–5 zdań podsumowania oraz uporządkowany JSON do pobrania.',
+      },
+    ],
   },
   privacy:
     'Plik PDF nie opuszcza Twojego urządzenia — tekst jest z niego odczytywany lokalnie w przeglądarce. Do API Anthropic wysyłany jest wyłącznie wyodrębniony tekst dokumentu w celu wygenerowania podsumowania. Nie przechowujemy ani pliku, ani jego treści.',
@@ -80,6 +95,9 @@ export const messages = {
     keywords: 'Słowa kluczowe',
     none: 'brak',
     rawJson: 'Surowe dane JSON',
+    amountColumn: 'Kwota',
+    dateColumn: 'Data',
+    contextColumn: 'Kontekst',
   },
   documentTypes: {
     faktura: 'Faktura',

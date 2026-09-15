@@ -1,20 +1,10 @@
-const STEPS = [
-  { title: 'Wgraj PDF', text: 'Przeciągnij plik albo wybierz go z dysku. Maksymalnie 10 MB.' },
-  {
-    title: 'Odczyt lokalny',
-    text: 'Tekst jest wyodrębniany w Twojej przeglądarce – plik nie jest nigdzie wysyłany.',
-  },
-  {
-    title: 'Podsumowanie i dane',
-    text: 'Otrzymasz 3–5 zdań podsumowania oraz uporządkowany JSON do pobrania.',
-  },
-] as const;
+import { messages } from '../lib/messages';
 
 export function StateEmpty() {
   return (
-    <section className="empty" aria-label="Jak to działa">
+    <section className="empty" aria-label={messages.empty.ariaLabel}>
       <ol className="empty__steps">
-        {STEPS.map((step, index) => (
+        {messages.empty.steps.map((step, index) => (
           <li key={step.title} className="empty__step">
             <span className="empty__number" aria-hidden="true">
               {index + 1}

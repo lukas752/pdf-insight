@@ -26,11 +26,12 @@ import { StateLoading } from './StateLoading';
 export type Status =
   | { kind: 'empty' }
   | { kind: 'extracting'; progress: number }
-  | { kind: 'analyzing'; done: number; total: number; summarizing: boolean }
+  | { kind: 'analyzing'; done: number; total: number }
+  | { kind: 'summarizing' }
   | { kind: 'done'; result: Analysis; historyId: string | null }
   | { kind: 'error'; message: string; retryable: boolean };
 
-export type LoadingStatus = Extract<Status, { kind: 'extracting' | 'analyzing' }>;
+export type LoadingStatus = Extract<Status, { kind: 'extracting' | 'analyzing' | 'summarizing' }>;
 
 function describeError(error: unknown): { message: string; retryable: boolean } {
   if (error instanceof ScannedPdfError) {
@@ -72,25 +73,26 @@ function statusFromProgress(progress: AnalysisProgress): Status {
         progress: progress.total === 0 ? 0 : progress.page / progress.total,
       };
     case 'analyzing':
-      return { kind: 'analyzing', done: progress.done, total: progress.total, summarizing: false };
+      return { kind: 'analyzing', done: progress.done, total: progress.total };
     case 'summarizing':
-      return { kind: 'analyzing', done: 0, total: 0, summarizing: true };
+      return { kind: 'summarizing' };
   }
 }
 
-/** Text for the polite live region, so screen readers hear every state change. */
+/** Text for the polite live region. Errors are announced by their own role="alert" instead. */
 function liveText(status: Status): string {
   switch (status.kind) {
     case 'empty':
+    case 'error':
       return '';
     case 'extracting':
       return messages.status.extractingStart;
     case 'analyzing':
-      return status.summarizing ? messages.status.analyzingSummary : messages.status.analyzing;
+      return messages.status.analyzing;
+    case 'summarizing':
+      return messages.status.analyzingSummary;
     case 'done':
       return messages.status.done;
-    case 'error':
-      return `${messages.status.error} ${status.message}`;
   }
 }
 
@@ -114,6 +116,7 @@ function Analyzer({ apiUrl }: { apiUrl: string }) {
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   const [lastFile, setLastFile] = useState<File | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     return () => controllerRef.current?.abort();
@@ -170,6 +173,8 @@ function Analyzer({ apiUrl }: { apiUrl: string }) {
     controllerRef.current?.abort();
     setLastFile(null);
     setStatus({ kind: 'empty' });
+    // The button that was clicked disappears with the result; keep focus in the page.
+    dropZoneRef.current?.focus();
   }
 
   function handleRestore(entry: HistoryEntry): void {
@@ -190,10 +195,14 @@ function Analyzer({ apiUrl }: { apiUrl: string }) {
     downloadJson(analysisFileName(result.document.fileName), result);
   }
 
-  const busy = status.kind === 'extracting' || status.kind === 'analyzing';
+  const busy =
+    status.kind === 'extracting' || status.kind === 'analyzing' || status.kind === 'summarizing';
 
   return (
     <div className="app">
+      <a className="skip-link" href="#main">
+        {messages.app.skipToContent}
+      </a>
       <header className="app__header">
         <h1 className="app__title">{messages.app.title}</h1>
         <p className="app__tagline">{messages.app.tagline}</p>
@@ -205,13 +214,13 @@ function Analyzer({ apiUrl }: { apiUrl: string }) {
 
       <div className="layout">
         <main className="main" id="main">
-          <DropZone onFile={handleFile} disabled={busy} />
+          <DropZone ref={dropZoneRef} onFile={handleFile} disabled={busy} />
           <PrivacyNotice />
 
           {status.kind === 'empty' && <StateEmpty />}
-          {(status.kind === 'extracting' || status.kind === 'analyzing') && (
-            <StateLoading status={status} />
-          )}
+          {(status.kind === 'extracting' ||
+            status.kind === 'analyzing' ||
+            status.kind === 'summarizing') && <StateLoading status={status} />}
           {status.kind === 'error' && (
             <StateError
               message={status.message}

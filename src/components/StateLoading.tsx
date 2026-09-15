@@ -6,19 +6,19 @@ interface StateLoadingProps {
 }
 
 function describe(status: LoadingStatus): { label: string; fraction: number | null } {
-  if (status.kind === 'extracting') {
-    return { label: messages.status.extractingStart, fraction: status.progress };
+  switch (status.kind) {
+    case 'extracting':
+      return { label: messages.status.extractingStart, fraction: status.progress };
+    case 'summarizing':
+      return { label: messages.status.analyzingSummary, fraction: null };
+    case 'analyzing':
+      return status.total > 1
+        ? {
+            label: messages.status.analyzingChunks(status.done, status.total),
+            fraction: status.done / status.total,
+          }
+        : { label: messages.status.analyzing, fraction: null };
   }
-  if (status.summarizing) {
-    return { label: messages.status.analyzingSummary, fraction: null };
-  }
-  if (status.total > 1) {
-    return {
-      label: messages.status.analyzingChunks(status.done, status.total),
-      fraction: status.done / status.total,
-    };
-  }
-  return { label: messages.status.analyzing, fraction: null };
 }
 
 export function StateLoading({ status }: StateLoadingProps) {
@@ -33,6 +33,7 @@ export function StateLoading({ status }: StateLoadingProps) {
         aria-label={label}
         aria-valuemin={0}
         aria-valuemax={100}
+        // `exactOptionalPropertyTypes` forbids `aria-valuenow={undefined}`, hence the conditional spread.
         {...(percent === null ? {} : { 'aria-valuenow': percent })}
       >
         <div
