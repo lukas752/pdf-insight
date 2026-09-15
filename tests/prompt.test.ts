@@ -26,6 +26,10 @@ describe('sanitizeDocumentText', () => {
     expect(sanitizeDocumentText('a < / DOCUMENT_TEXT > b <document_text > c')).toBe('a  b  c');
   });
 
+  it('strips self-closing tags and tags with attributes', () => {
+    expect(sanitizeDocumentText('a <document_text/> b </document_text foo="1"> c')).toBe('a  b  c');
+  });
+
   it('leaves ordinary text untouched', () => {
     const text = 'Zwykły tekst z <b>tagiem</b> i znakiem < 5.';
     expect(sanitizeDocumentText(text)).toBe(text);

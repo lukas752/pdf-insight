@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { analysisSchema, countSentences, type Analysis } from '../src/lib/schema';
+import {
+  analysisResponseSchema,
+  analysisSchema,
+  summaryResponseSchema,
+  type Analysis,
+} from '../src/lib/schema';
 
 const validAnalysis: Analysis = {
   document: {
@@ -22,6 +27,12 @@ const validAnalysis: Analysis = {
   keywords: ['serwis', 'SLA'],
 };
 
+const threeSentences = [
+  'Umowa dotyczy usług serwisowych IT zgodnie z art. 5 ust. 2 regulaminu.',
+  'Stroną jest Przykład sp. z o.o. z siedzibą przy ul. Kwiatowej 12.',
+  'Wynagrodzenie wynosi ok. 12 500 zł netto miesięcznie.',
+];
+
 /** Returns a deep copy with one nested field replaced, so each test mutates its own object. */
 function withChange(change: (draft: Analysis) => void): unknown {
   const draft = structuredClone(validAnalysis);
@@ -29,10 +40,16 @@ function withChange(change: (draft: Analysis) => void): unknown {
   return draft;
 }
 
-describe('analysisSchema', () => {
+/** The Worker's response shape: the contract minus `summary`, plus `summarySentences`. */
+function workerResponse(sentences: string[]): unknown {
+  const { summary, ...rest } = structuredClone(validAnalysis);
+  void summary;
+  return { ...rest, summarySentences: sentences };
+}
+
+describe('analysisSchema (public contract)', () => {
   it('accepts a valid payload', () => {
-    const result = analysisSchema.safeParse(validAnalysis);
-    expect(result.success).toBe(true);
+    expect(analysisSchema.safeParse(validAnalysis).success).toBe(true);
   });
 
   it('rejects a document type outside the enum', () => {
@@ -45,6 +62,13 @@ describe('analysisSchema', () => {
   it('rejects a non-ISO document date', () => {
     const payload = withChange((d) => {
       d.document.date = '01.09.2026';
+    });
+    expect(analysisSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('rejects an impossible calendar date even in ISO layout', () => {
+    const payload = withChange((d) => {
+      d.document.date = '2026-13-45';
     });
     expect(analysisSchema.safeParse(payload).success).toBe(false);
   });
@@ -91,6 +115,20 @@ describe('analysisSchema', () => {
     expect(analysisSchema.safeParse(payload).success).toBe(false);
   });
 
+  it('rejects an empty summary', () => {
+    const payload = withChange((d) => {
+      d.summary = '';
+    });
+    expect(analysisSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('rejects a non-integer page count', () => {
+    const payload = withChange((d) => {
+      d.document.pages = 2.5;
+    });
+    expect(analysisSchema.safeParse(payload).success).toBe(false);
+  });
+
   it('accepts null title and null date', () => {
     const payload = withChange((d) => {
       d.document.title = null;
@@ -108,57 +146,58 @@ describe('analysisSchema', () => {
     });
     expect(analysisSchema.safeParse(payload).success).toBe(true);
   });
+});
 
-  it('rejects a summary with 2 sentences', () => {
-    const payload = withChange((d) => {
-      d.summary = 'Pierwsze zdanie. Drugie zdanie.';
-    });
-    expect(analysisSchema.safeParse(payload).success).toBe(false);
+describe('analysisResponseSchema (Worker response → contract)', () => {
+  it('accepts 3 sentences and joins them into `summary`', () => {
+    const parsed = analysisResponseSchema.safeParse(workerResponse(threeSentences));
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.summary).toBe(threeSentences.join(' '));
+      expect('summarySentences' in parsed.data).toBe(false);
+      expect(analysisSchema.safeParse(parsed.data).success).toBe(true);
+    }
   });
 
-  it('rejects a summary with 6 sentences', () => {
-    const payload = withChange((d) => {
-      d.summary = 'Raz. Dwa. Trzy. Cztery. Pięć. Sześć.';
-    });
-    expect(analysisSchema.safeParse(payload).success).toBe(false);
+  it('accepts 5 sentences', () => {
+    const five = [...threeSentences, 'Umowa trwa 12 miesięcy.', 'Kary umowne są ograniczone.'];
+    expect(analysisResponseSchema.safeParse(workerResponse(five)).success).toBe(true);
   });
 
-  it('rejects a non-integer page count', () => {
-    const payload = withChange((d) => {
-      d.document.pages = 2.5;
-    });
-    expect(analysisSchema.safeParse(payload).success).toBe(false);
+  it('rejects 2 sentences', () => {
+    expect(
+      analysisResponseSchema.safeParse(workerResponse(threeSentences.slice(0, 2))).success,
+    ).toBe(false);
+  });
+
+  it('rejects 6 sentences', () => {
+    const six = [...threeSentences, 'Cztery.', 'Pięć.', 'Sześć.'];
+    expect(analysisResponseSchema.safeParse(workerResponse(six)).success).toBe(false);
+  });
+
+  it('rejects a blank sentence', () => {
+    expect(
+      analysisResponseSchema.safeParse(workerResponse([...threeSentences.slice(0, 2), '   ']))
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects a plain `summary` string in place of the sentence list', () => {
+    expect(analysisResponseSchema.safeParse(validAnalysis).success).toBe(false);
   });
 });
 
-describe('countSentences', () => {
-  it('counts plain sentences ended with . ! and ?', () => {
-    expect(countSentences('Pierwsze. Drugie! Trzecie?')).toBe(3);
+describe('summaryResponseSchema', () => {
+  it('returns the joined summary for 3–5 sentences', () => {
+    const parsed = summaryResponseSchema.safeParse({ summarySentences: threeSentences });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data).toBe(threeSentences.join(' '));
+    }
   });
 
-  it('does not count a decimal point as a sentence break', () => {
-    expect(countSentences('Kwota wynosi 12.50 zł. Płatność w terminie 14 dni.')).toBe(2);
-  });
-
-  it('does not count "sp. z o.o." as sentence breaks', () => {
-    expect(countSentences('Stroną jest Przykład sp. z o.o. z Warszawy. Umowa trwa rok.')).toBe(2);
-  });
-
-  it('does not count lowercase abbreviations such as "np." or "tj."', () => {
-    expect(countSentences('Dokument zawiera załączniki, np. cennik. Obowiązuje od jutra.')).toBe(2);
-  });
-
-  it('counts a sentence that starts with a digit or a Polish capital letter', () => {
-    expect(
-      countSentences('Umowa trwa rok. 12 rat płatnych co miesiąc. Świadczenie jest stałe.'),
-    ).toBe(3);
-  });
-
-  it('treats an ellipsis as a single sentence end', () => {
-    expect(countSentences('To jeszcze nie koniec... Ale już blisko.')).toBe(2);
-  });
-
-  it('returns 0 for text without terminal punctuation', () => {
-    expect(countSentences('Brak kropki na końcu')).toBe(0);
+  it('rejects 6 sentences', () => {
+    const six = [...threeSentences, 'Cztery.', 'Pięć.', 'Sześć.'];
+    expect(summaryResponseSchema.safeParse({ summarySentences: six }).success).toBe(false);
   });
 });

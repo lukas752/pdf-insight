@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { analysisSchema } from '../lib/schema';
 
 /**
  * A single request never carries more text than this; longer documents are chunked
@@ -7,27 +6,16 @@ import { analysisSchema } from '../lib/schema';
  */
 export const MAX_REQUEST_TEXT_CHARS = 60_000;
 
-export const analyzeRequestSchema = z.object({
-  fileName: z.string().min(1).max(255),
-  pages: z.number().int().positive(),
+/** Body of POST /api/analyze. The Worker validates it with its own Zod schema. */
+export interface AnalyzeRequest {
+  fileName: string;
+  pages: number;
   /** `analyze` extracts data from document text; `summarize` condenses per-chunk summaries. */
-  task: z.enum(['analyze', 'summarize']),
-  text: z.string().min(1).max(MAX_REQUEST_TEXT_CHARS),
+  task: 'analyze' | 'summarize';
+  text: string;
   /** ISO 639-1 code of the document, known after the first chunk; used by `summarize`. */
-  language: z
-    .string()
-    .regex(/^[a-z]{2}$/)
-    .optional(),
-});
-
-export type AnalyzeRequest = z.infer<typeof analyzeRequestSchema>;
-
-/** Response of the `summarize` task – reuses the 3–5 sentence rule from the analysis schema. */
-export const summaryResponseSchema = z.object({
-  summary: analysisSchema.shape.summary,
-});
-
-export type SummaryResponse = z.infer<typeof summaryResponseSchema>;
+  language?: string;
+}
 
 /** Normalised error envelope returned by the Worker for every non-2xx response. */
 export const apiErrorEnvelopeSchema = z.object({

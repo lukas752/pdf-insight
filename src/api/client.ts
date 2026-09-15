@@ -1,9 +1,8 @@
 import { z } from 'zod';
-import { analysisSchema, type Analysis } from '../lib/schema';
+import { analysisResponseSchema, summaryResponseSchema, type Analysis } from '../lib/schema';
 import {
   API_ERROR_CODES,
   apiErrorEnvelopeSchema,
-  summaryResponseSchema,
   type AnalyzeRequest,
   type ApiErrorCode,
   type ClientErrorCode,
@@ -63,11 +62,12 @@ async function readErrorEnvelope(response: Response): Promise<ApiError> {
   return new ApiError(fallback, `HTTP ${response.status}`, response.status);
 }
 
-async function postAnalyze(
+/** Sends one request. Network failures and non-2xx responses become typed ApiErrors. */
+async function send(
   apiUrl: string,
   request: AnalyzeRequest,
   signal: AbortSignal | undefined,
-): Promise<unknown> {
+): Promise<Response> {
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   let response: Response;
   try {
@@ -86,20 +86,37 @@ async function postAnalyze(
     }
     throw new ApiError('NETWORK', error instanceof Error ? error.message : 'Network error');
   }
-
   if (!response.ok) {
     throw await readErrorEnvelope(response);
   }
+  return response;
+}
+
+type Attempt<T> = { ok: true; data: T } | { ok: false; detail: string };
+
+/** One request whose body is parsed and validated; an invalid body is reported, not thrown. */
+async function attempt<T>(
+  apiUrl: string,
+  request: AnalyzeRequest,
+  schema: z.ZodType<T>,
+  signal: AbortSignal | undefined,
+): Promise<Attempt<T>> {
+  const response = await send(apiUrl, request, signal);
+  let body: unknown;
   try {
-    return (await response.json()) as unknown;
+    body = await response.json();
   } catch {
-    throw new ApiError('INVALID_RESPONSE', 'Response body is not JSON', response.status);
+    return { ok: false, detail: 'Response body is not JSON' };
   }
+  const parsed = schema.safeParse(body);
+  return parsed.success
+    ? { ok: true, data: parsed.data }
+    : { ok: false, detail: z.prettifyError(parsed.error) };
 }
 
 /**
- * Posts a request and validates the body against `schema`. A response that fails validation
- * is retried exactly once; a second failure surfaces as INVALID_RESPONSE.
+ * A response that fails validation is retried exactly once; a second failure surfaces as
+ * INVALID_RESPONSE. HTTP and network errors are not retried here – the user gets a retry button.
  */
 async function requestValidated<T>(
   apiUrl: string,
@@ -107,15 +124,15 @@ async function requestValidated<T>(
   schema: z.ZodType<T>,
   signal?: AbortSignal,
 ): Promise<T> {
-  const first = schema.safeParse(await postAnalyze(apiUrl, request, signal));
-  if (first.success) {
+  const first = await attempt(apiUrl, request, schema, signal);
+  if (first.ok) {
     return first.data;
   }
-  const second = schema.safeParse(await postAnalyze(apiUrl, request, signal));
-  if (second.success) {
+  const second = await attempt(apiUrl, request, schema, signal);
+  if (second.ok) {
     return second.data;
   }
-  throw new ApiError('INVALID_RESPONSE', z.prettifyError(second.error));
+  throw new ApiError('INVALID_RESPONSE', second.detail);
 }
 
 export function analyzeText(
@@ -123,19 +140,13 @@ export function analyzeText(
   request: Omit<AnalyzeRequest, 'task'>,
   signal?: AbortSignal,
 ): Promise<Analysis> {
-  return requestValidated(apiUrl, { ...request, task: 'analyze' }, analysisSchema, signal);
+  return requestValidated(apiUrl, { ...request, task: 'analyze' }, analysisResponseSchema, signal);
 }
 
-export async function summarizeText(
+export function summarizeText(
   apiUrl: string,
   request: Omit<AnalyzeRequest, 'task'>,
   signal?: AbortSignal,
 ): Promise<string> {
-  const response = await requestValidated(
-    apiUrl,
-    { ...request, task: 'summarize' },
-    summaryResponseSchema,
-    signal,
-  );
-  return response.summary;
+  return requestValidated(apiUrl, { ...request, task: 'summarize' }, summaryResponseSchema, signal);
 }
